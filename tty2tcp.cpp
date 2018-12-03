@@ -165,6 +165,7 @@ int main()
     }
 
     close(serv_sock);
+    close(fd_ser);
     printf("bye");
 
     return 0;
