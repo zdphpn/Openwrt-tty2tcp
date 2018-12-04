@@ -1,3 +1,4 @@
+
 //============================================================================
 // Name        : tty2tcp.cpp
 // Author      :
@@ -19,38 +20,79 @@
 
 #include <fcntl.h>
 #include <sys/types.h>
+#include <termios.h>
 
 #include <iostream>
 #include <list>
 using namespace std;
 
-void error(const char *msg)
+
+char recv_data[100];                                    //data
+int recv_len;                                           //data len
+
+int serv_sock, fd_ser;                                  //server socket&serial fd
+list<int> clnt_list;                                    //client list
+
+
+static void error(const char *msg)
 {
     fputs(msg, stderr);
+
+    list<int>::iterator plist;                          //list iterator
+    for(plist = clnt_list.begin(); plist != clnt_list.end(); plist++)
+    {
+    	if(*plist>0)
+        {
+            close(*plist);
+        }
+    }
+    if(serv_sock>0)
+    {
+        close(serv_sock);                               //close
+    }
+    if(fd_ser>0)
+    {
+        close(fd_ser);
+    }
+
     exit(1);
 }
 
-static void ser_set()
+static void ser_set(int fd)
 {
+    struct termios opt;
 
+    bzero(&opt,sizeof(opt));
+    opt.c_cflag|=(CLOCAL|CREAD);
+
+    opt.c_cflag&=(~CSIZE);
+    opt.c_cflag|=CS8;                                   //8bit
+
+    opt.c_cflag&=(~PARENB);                             //no parity
+
+    cfsetispeed(&opt,B115200);                          //115200bps
+    cfsetospeed(&opt,B115200);
+
+    opt.c_cflag&=(~CSTOPB);                             //1 stop bit
+
+    opt.c_lflag|=(ICANON|ECHO);                         //ican&echo
+
+    if(tcsetattr(fd,TCSANOW,&opt)<0)                    //set
+    {
+        error("tcsetattr() error\n");
+    }
 }
 
-char recv_data[100];
-int recv_len;
 
 int main()
 {
 
-    int serv_sock, clnt_sock;                           //socket handle
+    int clnt_sock;                                      //client socket handle
     struct sockaddr_in serv_addr, clnt_addr;            //socket address
     socklen_t clnt_addr_size;                           //client address size
 
     fd_set reads, cpy_reads;                            //select fd
-    int fd_min, fd_max, fd_ser;                         //min&max&ser fd
-
-    list<int> clnt_list;                                //client list
-
-
+    int fd_min, fd_max;                                 //min&max fd
 
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);        //make socket
     if(serv_sock < 0)
@@ -90,7 +132,7 @@ int main()
     fd_min = serv_sock;
 
 
-    fd_ser = open("/dev/ttyS1", O_RDWR | O_NOCTTY | O_NDELAY);
+    fd_ser = open("/dev/ttyS0", O_RDWR | O_NOCTTY | O_NDELAY);
     if(fd_ser < 0)
     {
         error("serial open error\n");
@@ -102,7 +144,7 @@ int main()
     FD_SET(fd_ser, &reads);                             //add fd
     fd_max = fd_ser;
 
-    ser_set();
+    ser_set(fd_ser);                                    //serial set
 
 
     while(1)
@@ -118,7 +160,7 @@ int main()
                     if(i == serv_sock)                  //if server socket
                     {
                         clnt_addr_size = sizeof(clnt_addr);
-                        //accept
+                                                        //accept
                         clnt_sock = accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
                         FD_SET(clnt_sock, &reads);      //add fd
                         if(fd_max < clnt_sock)          //update fd_max
@@ -131,7 +173,7 @@ int main()
                     }
                     else if(i == fd_ser)                //if serial
                     {
-                        recv_len = read(i, recv_data, 10);
+                        recv_len = read(i, recv_data, sizeof(recv_data));
                         if(recv_len > 0)
                         {
                             list<int>::iterator plist;  //list iterator
@@ -144,8 +186,8 @@ int main()
                         }
                     }
                     else                                //other
-                    {
-                        recv_len = read(i, recv_data, 10);//read
+                    {                                   //read
+                        recv_len = read(i, recv_data, sizeof(recv_data));
                         if(recv_len == 0)               //0 is close
                         {
                             FD_CLR(i, &reads);          //delete fd
@@ -164,9 +206,16 @@ int main()
         }
     }
 
-    close(serv_sock);
+    list<int>::iterator plist;                           //list iterator
+    for(plist = clnt_list.begin(); plist != clnt_list.end(); plist++)
+    {
+        close(*plist);
+    }
+    close(serv_sock);                                    //close
     close(fd_ser);
     printf("bye");
 
     return 0;
 }
+
+
