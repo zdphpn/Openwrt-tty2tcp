@@ -1,7 +1,7 @@
 # Openwrt-tty2tcp
 
 ## 说明：
-Openwrt下，串口与TCP之间进行数据转换。  
+    Openwrt下，串口与TCP之间进行数据转换。  
 
 ## 使用：
 
