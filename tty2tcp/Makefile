@@ -20,7 +20,7 @@ define Package/tty2tcp/install
 	
 	#已经存在tty2tcp(bin)
 	$(INSTALL_BIN) ./src/tty2tcp $(1)/usr/bin
-    #只有tty2tcp.cpp,需要编译生成tty2tcp(bin)
+	#只有tty2tcp.cpp,需要编译生成tty2tcp(bin)
 	#$(INSTALL_BIN) $(PKG_BUILD_DIR)/tty2tcp $(1)/usr/bin
 	
 	$(INSTALL_BIN) ./files/tty2tcp.init $(1)/etc/init.d/tty2tcp
